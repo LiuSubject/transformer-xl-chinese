@@ -17,9 +17,9 @@ from absl import flags
 import tensorflow as tf
 from vocabulary import Vocab
 
-from tensorflow.gfile import Exists as exists
-from tensorflow.gfile import MakeDirs as makedirs
-from tensorflow.gfile import Glob as glob
+from tensorflow.python.platform.gfile import Exists as exists
+from tensorflow.python.platform.gfile import MakeDirs as makedirs
+from tensorflow.python.platform.gfile import Glob as glob
 
 
 def _preprocess(shard, train, vocab, save_dir, cutoffs, bin_sizes, bsz, tgt_len,

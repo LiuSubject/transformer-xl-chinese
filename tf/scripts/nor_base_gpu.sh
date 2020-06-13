@@ -3,7 +3,7 @@
 #!/bin/bash
 
 # Data
-DATA_ROOT=../data/doupo/
+DATA_ROOT=../data/nor/
 
 # Model
 DIV_VAL=1
