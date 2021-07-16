@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from vocabulary import Vocab
 import csv
 

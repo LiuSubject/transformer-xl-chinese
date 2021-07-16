@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import matplotlib
 matplotlib.use('AGG')
 from matplotlib import pyplot as plt
