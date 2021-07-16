@@ -91,7 +91,7 @@ def main(_):
     for name in var_values:  # Average.
         var_values[name] /= len(checkpoints)
 
-    with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=tf.compat.v1.AUTO_REUSE):
+    with tf.compat.v1.variable_scope(tf.Variable(), reuse=tf.compat.v1.AUTO_REUSE):
         tf_vars = [
             tf.compat.v1.get_variable(v, shape=var_values[v].shape, dtype=var_dtypes[v])
             for v in var_values
