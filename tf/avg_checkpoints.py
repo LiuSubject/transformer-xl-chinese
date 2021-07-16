@@ -57,7 +57,7 @@ def main(_):
         assert FLAGS.num_last_checkpoints >= 1, "Must average at least one model"
         assert FLAGS.prefix, ("Prefix must be provided when averaging last"
                               " N checkpoints")
-        checkpoint_state = tf.train.get_checkpoint_state(
+        checkpoint_state = tf.compat.v1.train.get_checkpoint_state(
             os.path.dirname(FLAGS.prefix))
         # Checkpoints are ordered from oldest to newest.
         checkpoints = checkpoint_state.all_model_checkpoint_paths[
@@ -76,13 +76,13 @@ def main(_):
     tf.compat.v1.logging.info("Reading variables and averaging checkpoints:")
     for c in checkpoints:
         tf.compat.v1.logging.info("%s ", c)
-    # var_list = tf.contrib.framework.list_variables(checkpoints[0])
+    # var_list = tf.compat.v1.contrib.framework.list_variables(checkpoints[0])
     var_values, var_dtypes = {}, {}
     # for (name, shape) in var_list:
     #     if not name.startswith("global_step"):
     #         var_values[name] = np.zeros(shape)
     # for checkpoint in checkpoints:
-    #     reader = tf.contrib.framework.load_checkpoint(checkpoint)
+    #     reader = tf.compat.v1.contrib.framework.load_checkpoint(checkpoint)
     #     for name in var_values:
     #         tensor = reader.get_tensor(name)
     #         var_dtypes[name] = tensor.dtype
@@ -98,8 +98,8 @@ def main(_):
         ]
     placeholders = [tf.compat.v1.placeholder(v.dtype, shape=v.shape) for v in tf_vars]
     assign_ops = [tf.compat.v1.assign(v, p) for (v, p) in zip(tf_vars, placeholders)]
-    global_step = tf.Variable(
-        0, name="global_step", trainable=False, dtype=tf.int64)
+    global_step = tf.compat.v1.Variable(
+        0, name="global_step", trainable=False, dtype=tf.compat.v1.int64)
     saver = tf.compat.v1.train.Saver(tf.compat.v1.all_variables())
 
     # Build a model consisting only of variables, set them to the average values.

@@ -147,19 +147,19 @@ FLAGS = flags.FLAGS
 
 def get_model_fn(n_token, cutoffs):
     def model_fn(inp, tgt, mems, is_training):
-        inp = tf.transpose(inp, [1, 0])
-        tgt = tf.transpose(tgt, [1, 0])
+        inp = tf.compat.v1.transpose(inp, [1, 0])
+        tgt = tf.compat.v1.transpose(tgt, [1, 0])
 
         if FLAGS.init == "uniform":
-            initializer = tf.initializers.random_uniform(
+            initializer = tf.compat.v1.initializers.random_uniform(
                 minval=-FLAGS.init_range,
                 maxval=FLAGS.init_range,
                 seed=None)
         elif FLAGS.init == "normal":
-            initializer = tf.initializers.random_normal(
+            initializer = tf.compat.v1.initializers.random_normal(
                 stddev=FLAGS.init_std,
                 seed=None)
-            proj_initializer = tf.initializers.random_normal(
+            proj_initializer = tf.compat.v1.initializers.random_normal(
                 stddev=FLAGS.proj_init_std,
                 seed=None)
 
@@ -202,13 +202,13 @@ def get_model_fn(n_token, cutoffs):
         tf.compat.v1.logging.info('#params: {}'.format(num_params))
 
         # format_str = '{{:<{0}s}}\t{{}}'.format(
-        #     max([len(v.name) for v in tf.trainable_variables()]))
-        # for v in tf.trainable_variables():
+        #     max([len(v.name) for v in tf.compat.v1.trainable_variables()]))
+        # for v in tf.compat.v1.trainable_variables():
         #   tf.compat.v1.logging.info(format_str.format(v.name, v.get_shape()))
 
         if is_training:
             all_vars = tf.compat.v1.trainable_variables()
-            grads = tf.gradients(loss, all_vars)
+            grads = tf.compat.v1.gradients(loss, all_vars)
             grads_and_vars = list(zip(grads, all_vars))
 
             return loss, new_mems, grads_and_vars
@@ -254,10 +254,10 @@ def train(n_token, cutoffs, ps_device):
 
     input_feed, label_feed = train_set.make_one_shot_iterator().get_next()
 
-    inputs = tf.split(input_feed, FLAGS.num_core_per_host, 0)
-    labels = tf.split(label_feed, FLAGS.num_core_per_host, 0)
+    inputs = tf.compat.v1.split(input_feed, FLAGS.num_core_per_host, 0)
+    labels = tf.compat.v1.split(label_feed, FLAGS.num_core_per_host, 0)
 
-    print_op = tf.print(inputs)
+    print_op = tf.compat.v1.print(inputs)
 
     per_core_bsz = FLAGS.train_batch_size // FLAGS.num_core_per_host
 
@@ -266,9 +266,9 @@ def train(n_token, cutoffs, ps_device):
     for i in range(FLAGS.num_core_per_host):
         reuse = True if i > 0 else None
         #todo  review here
-        with tf.device(assign_to_gpu(i, ps_device)), \
+        with tf.compat.v1.device(assign_to_gpu(i, ps_device)), \
              tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=reuse):
-            mems_i = [tf.compat.v1.placeholder(tf.float32,
+            mems_i = [tf.compat.v1.placeholder(tf.compat.v1.float32,
                                      [FLAGS.mem_len, per_core_bsz, FLAGS.d_model])
                       for _ in range(FLAGS.n_layer)]
 
@@ -287,7 +287,7 @@ def train(n_token, cutoffs, ps_device):
 
     # average losses and gradients across towers
     if len(tower_losses) > 1:
-        loss = tf.add_n(tower_losses) / len(tower_losses)
+        loss = tf.compat.v1.add_n(tower_losses) / len(tower_losses)
         grads_and_vars = average_grads_and_vars(tower_grads_and_vars)
     else:
         loss = tower_losses[0]
@@ -295,7 +295,7 @@ def train(n_token, cutoffs, ps_device):
     grads, all_vars = zip(*grads_and_vars)
 
     # clip gradient
-    clipped, gnorm = tf.clip_by_global_norm(grads, FLAGS.clip)
+    clipped, gnorm = tf.compat.v1.clip_by_global_norm(grads, FLAGS.clip)
     grads_and_vars = list(zip(clipped, all_vars))
 
     # configure the optimizer
@@ -316,7 +316,7 @@ def train(n_token, cutoffs, ps_device):
         alpha=FLAGS.min_lr_ratio)
 
     # choose warmup or decay
-    learning_rate = tf.where(global_step < FLAGS.warmup_steps,
+    learning_rate = tf.compat.v1.where(global_step < FLAGS.warmup_steps,
                              warmup_lr, decay_lr)
 
     # get the train op
@@ -332,9 +332,9 @@ def train(n_token, cutoffs, ps_device):
 
     saver = tf.compat.v1.train.Saver()
 
-    tf.summary.scalar('learning_rate', learning_rate)
-    tf.summary.scalar('loss', loss)
-    # tf.summary.scalar('pplx', math.exp(curr_loss))
+    tf.compat.v1.summary.scalar('learning_rate', learning_rate)
+    tf.compat.v1.summary.scalar('loss', loss)
+    # tf.compat.v1.summary.scalar('pplx', math.exp(curr_loss))
     merged = tf.compat.v1.summary.merge_all()
 
     with tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(allow_soft_placement=True)) as sess:
@@ -359,7 +359,7 @@ def train(n_token, cutoffs, ps_device):
             #old
             # fetched = sess.run(fetches, feed_dict=feed_dict)
 
-            # with tf.control_dependencies([print_op]):
+            # with tf.compat.v1.control_dependencies([print_op]):
             summary, fetched = sess.run([merged, fetches], feed_dict=feed_dict)
 
             loss_np, tower_mems_np, curr_step = fetched[:3]
@@ -405,16 +405,16 @@ def evaluate(n_token, cutoffs, ps_device):
 
     input_feed, label_feed = eval_set.make_one_shot_iterator().get_next()
 
-    inputs = tf.split(input_feed, FLAGS.num_core_per_host, 0)
-    labels = tf.split(label_feed, FLAGS.num_core_per_host, 0)
+    inputs = tf.compat.v1.split(input_feed, FLAGS.num_core_per_host, 0)
+    labels = tf.compat.v1.split(label_feed, FLAGS.num_core_per_host, 0)
 
     per_core_bsz = FLAGS.eval_batch_size // FLAGS.num_core_per_host
     tower_mems, tower_losses, tower_new_mems = [], [], []
 
     for i in range(FLAGS.num_core_per_host):
-        with tf.device(assign_to_gpu(i, ps_device)), \
+        with tf.compat.v1.device(assign_to_gpu(i, ps_device)), \
              tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=tf.compat.v1.AUTO_REUSE):
-            mems_i = [tf.compat.v1.placeholder(tf.float32,
+            mems_i = [tf.compat.v1.placeholder(tf.compat.v1.float32,
                                      [FLAGS.mem_len, per_core_bsz, FLAGS.d_model])
                       for _ in range(FLAGS.n_layer)]
 
@@ -432,7 +432,7 @@ def evaluate(n_token, cutoffs, ps_device):
 
     # sum losses across towers
     if len(tower_losses) > 1:
-        loss = tf.add_n(tower_losses) / len(tower_losses)
+        loss = tf.compat.v1.add_n(tower_losses) / len(tower_losses)
     else:
         loss = tower_losses[0]
 
@@ -449,13 +449,13 @@ def evaluate(n_token, cutoffs, ps_device):
         sess.run(tf.compat.v1.global_variables_initializer())
 
         if FLAGS.eval_ckpt_path is None:
-            eval_ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
+            eval_ckpt_path = tf.compat.v1.train.latest_checkpoint(FLAGS.model_dir)
         else:
             eval_ckpt_path = FLAGS.eval_ckpt_path
         tf.compat.v1.logging.info("Evaluate {}".format(eval_ckpt_path))
         saver.restore(sess, eval_ckpt_path)
 
-        fetches = [loss, tower_new_mems, tf.size(label_feed)]
+        fetches = [loss, tower_new_mems, tf.compat.v1.size(label_feed)]
 
         format_str = "  >> processing batch {{:{0}d}}/{{:{0}d}} ..".format(
             len(str(num_batch)))
@@ -510,14 +510,14 @@ def inference(n_token, cutoffs, ps_device):
     n_token = len(tmp_Vocab)
     # print(tmp_Vocab.idx2sym)
 
-    test_list = tf.compat.v1.placeholder(tf.int64, shape=[1, None])
-    dataset = tf.data.Dataset.from_tensors(test_list)
+    test_list = tf.compat.v1.placeholder(tf.compat.v1.int64, shape=[1, None])
+    dataset = tf.compat.v1.data.Dataset.from_tensors(test_list)
     # dataset = dataset.batch(1, drop_remainder=True)
 
     iterator = dataset.make_initializable_iterator()
     input_feed = iterator.get_next()
 
-    inputs = tf.split(input_feed, FLAGS.num_core_per_host, 0)
+    inputs = tf.compat.v1.split(input_feed, FLAGS.num_core_per_host, 0)
     # inputs = input_feed
 
     per_core_bsz = 1
@@ -528,13 +528,13 @@ def inference(n_token, cutoffs, ps_device):
     tower_attn_prob = []
 
     for i in range(FLAGS.num_core_per_host):
-        with tf.device(assign_to_gpu(i, ps_device)), \
+        with tf.compat.v1.device(assign_to_gpu(i, ps_device)), \
              tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=tf.compat.v1.AUTO_REUSE):
-            mems_i = [tf.compat.v1.placeholder(tf.float32,
+            mems_i = [tf.compat.v1.placeholder(tf.compat.v1.float32,
                                      [FLAGS.mem_len, per_core_bsz, FLAGS.d_model])
                       for _ in range(FLAGS.n_layer)]
 
-            mems_i_id = [tf.compat.v1.placeholder(tf.int64,
+            mems_i_id = [tf.compat.v1.placeholder(tf.compat.v1.int64,
                                      [FLAGS.mem_len, per_core_bsz])
                       for _ in range(FLAGS.n_layer)]
 
@@ -572,7 +572,7 @@ def inference(n_token, cutoffs, ps_device):
         sess.run(tf.compat.v1.global_variables_initializer())
 
         if FLAGS.eval_ckpt_path is None:
-            eval_ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
+            eval_ckpt_path = tf.compat.v1.train.latest_checkpoint(FLAGS.model_dir)
         else:
             eval_ckpt_path = FLAGS.eval_ckpt_path
 
@@ -675,18 +675,18 @@ def single_core_graph_for_inference(n_token, cutoffs, is_training, inp,  mems, m
 
 def get_model_fn_for_inference(n_token, cutoffs):
     def model_fn(inp, mems, mems_id, is_training):
-        inp = tf.transpose(inp, [1, 0])
+        inp = tf.compat.v1.transpose(inp, [1, 0])
 
         if FLAGS.init == "uniform":
-            initializer = tf.initializers.random_uniform(
+            initializer = tf.compat.v1.initializers.random_uniform(
                 minval=-FLAGS.init_range,
                 maxval=FLAGS.init_range,
                 seed=None)
         elif FLAGS.init == "normal":
-            initializer = tf.initializers.random_normal(
+            initializer = tf.compat.v1.initializers.random_normal(
                 stddev=FLAGS.init_std,
                 seed=None)
-            proj_initializer = tf.initializers.random_normal(
+            proj_initializer = tf.compat.v1.initializers.random_normal(
                 stddev=FLAGS.proj_init_std,
                 seed=None)
 

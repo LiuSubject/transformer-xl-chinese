@@ -211,11 +211,11 @@ def get_bin_sizes(data, batch_size, tgt_len, cutoffs, std_mult=[2.5, 2.5, 2.5]):
 
 
 def _int64_feature(values):
-    return tf.train.Feature(int64_list=tf.train.Int64List(value=values))
+    return tf.compat.v1.train.Feature(int64_list=tf.compat.v1.train.Int64List(value=values))
 
 
 def _float_feature(values):
-    return tf.train.Feature(float_list=tf.train.FloatList(value=values))
+    return tf.compat.v1.train.Feature(float_list=tf.compat.v1.train.FloatList(value=values))
 
 
 def batchify(data, batch_size, num_passes):
@@ -329,7 +329,7 @@ def create_ordered_tfrecords(save_dir, basename, data, batch_size, tgt_len,
                 _add_perm_feature(feature, inp_pos_per_bin, inp_cnts, "inp")
                 _add_perm_feature(feature, tgt_pos_per_bin, tgt_cnts, "tgt")
 
-            example = tf.train.Example(features=tf.train.Features(feature=feature))
+            example = tf.compat.v1.train.Example(features=tf.compat.v1.train.Features(feature=feature))
             record_writer.write(example.SerializeToString())
 
         num_batch += 1
@@ -448,11 +448,11 @@ def get_input_fn(record_info_dir, split, per_host_bsz, tgt_len,
                     cnt = example.pop("{}_cnt_{}".format(prefix, b))[0]
                     tup = example.pop("{}_tup_{}".format(prefix, b))
 
-                    tup = tf.reshape(
+                    tup = tf.compat.v1.reshape(
                         tf.compat.v1.sparse_tensor_to_dense(tup),
                         shape=[cnt, 2])
 
-                    # tf.float32
+                    # tf.compat.v1.float32
                     perm = tf.compat.v1.sparse_to_dense(
                         sparse_indices=tup,
                         output_shape=[tgt_len, bin_sizes[b]],
@@ -464,28 +464,28 @@ def get_input_fn(record_info_dir, split, per_host_bsz, tgt_len,
             # whether allow the last batch with a potentially shorter length
             if use_tpu:
                 record_spec = {
-                    "inputs": tf.compat.v1.FixedLenFeature([tgt_len], tf.int64),
-                    "labels": tf.compat.v1.FixedLenFeature([tgt_len], tf.int64),
+                    "inputs": tf.compat.v1.FixedLenFeature([tgt_len], tf.compat.v1.int64),
+                    "labels": tf.compat.v1.FixedLenFeature([tgt_len], tf.compat.v1.int64),
                 }
             else:
                 record_spec = {
-                    "inputs": tf.compat.v1.VarLenFeature(tf.int64),
-                    "labels": tf.compat.v1.VarLenFeature(tf.int64),
+                    "inputs": tf.compat.v1.VarLenFeature(tf.compat.v1.int64),
+                    "labels": tf.compat.v1.VarLenFeature(tf.compat.v1.int64),
                 }
 
             # permutation related features
             if bin_sizes and use_tpu:
-                # tf.float32
-                record_spec["inp_mask"] = tf.compat.v1.FixedLenFeature([tgt_len], tf.float32)
-                record_spec["tgt_mask"] = tf.compat.v1.FixedLenFeature([tgt_len], tf.float32)
+                # tf.compat.v1.float32
+                record_spec["inp_mask"] = tf.compat.v1.FixedLenFeature([tgt_len], tf.compat.v1.float32)
+                record_spec["tgt_mask"] = tf.compat.v1.FixedLenFeature([tgt_len], tf.compat.v1.float32)
 
-                record_spec["head_labels"] = tf.compat.v1.FixedLenFeature([tgt_len], tf.int64)
+                record_spec["head_labels"] = tf.compat.v1.FixedLenFeature([tgt_len], tf.compat.v1.int64)
 
                 for b in range(len(bin_sizes)):
-                    record_spec["inp_cnt_{}".format(b)] = tf.compat.v1.FixedLenFeature([1], tf.int64)
-                    record_spec["inp_tup_{}".format(b)] = tf.compat.v1.VarLenFeature(tf.int64)
-                    record_spec["tgt_cnt_{}".format(b)] = tf.compat.v1.FixedLenFeature([1], tf.int64)
-                    record_spec["tgt_tup_{}".format(b)] = tf.compat.v1.VarLenFeature(tf.int64)
+                    record_spec["inp_cnt_{}".format(b)] = tf.compat.v1.FixedLenFeature([1], tf.compat.v1.int64)
+                    record_spec["inp_tup_{}".format(b)] = tf.compat.v1.VarLenFeature(tf.compat.v1.int64)
+                    record_spec["tgt_cnt_{}".format(b)] = tf.compat.v1.FixedLenFeature([1], tf.compat.v1.int64)
+                    record_spec["tgt_tup_{}".format(b)] = tf.compat.v1.VarLenFeature(tf.compat.v1.int64)
 
             # retrieve serialized example
             example = tf.compat.v1.parse_single_example(
@@ -501,9 +501,9 @@ def get_input_fn(record_info_dir, split, per_host_bsz, tgt_len,
             # cast sparse to dense
             for key in list(example.keys()):
                 val = example[key]
-                if tf.keras.backend.is_sparse(val):
-                    val = tf.sparse.to_dense(val)
-                if val.dtype == tf.int64:
+                if tf.compat.v1.keras.backend.is_sparse(val):
+                    val = tf.compat.v1.sparse.to_dense(val)
+                if val.dtype == tf.compat.v1.int64:
                     val = tf.compat.v1.to_int32(val)
                 example[key] = val
 
@@ -518,10 +518,10 @@ def get_input_fn(record_info_dir, split, per_host_bsz, tgt_len,
             file_paths.append(file_path)
 
         if split == "train":
-            dataset = tf.data.Dataset.from_tensor_slices(file_paths)
+            dataset = tf.compat.v1.data.Dataset.from_tensor_slices(file_paths)
             if len(file_paths) > 1:
                 dataset = dataset.shuffle(len(file_paths)).repeat()
-                dataset = tf.data.TFRecordDataset(dataset)
+                dataset = tf.compat.v1.data.TFRecordDataset(dataset)
             elif num_hosts > 1:
                 host_id = params["context"].current_host
                 # drop the remaining batches
@@ -530,18 +530,18 @@ def get_input_fn(record_info_dir, split, per_host_bsz, tgt_len,
                 my_start_sample_id = (host_id * num_batch_per_host * num_core_per_host *
                                       per_core_bsz)
                 my_sample_num = num_batch_per_host * num_core_per_host * per_core_bsz
-                dataset = tf.data.TFRecordDataset(dataset).skip(
+                dataset = tf.compat.v1.data.TFRecordDataset(dataset).skip(
                     my_start_sample_id).take(my_sample_num)
             else:
-                dataset = tf.data.TFRecordDataset(dataset)
+                dataset = tf.compat.v1.data.TFRecordDataset(dataset)
 
             dataset = dataset.map(parser).cache().repeat()
             dataset = dataset.batch(per_core_bsz, drop_remainder=True)
             dataset = dataset.prefetch(num_core_per_host * per_core_bsz)
         else:
             # do not shuffle, repeat or cache in evaluation
-            dataset = tf.data.Dataset.from_tensor_slices(file_paths)
-            dataset = tf.data.TFRecordDataset(dataset)
+            dataset = tf.compat.v1.data.Dataset.from_tensor_slices(file_paths)
+            dataset = tf.compat.v1.data.TFRecordDataset(dataset)
             dataset = dataset.map(parser)
             dataset = dataset.batch(per_core_bsz, drop_remainder=True)
 
