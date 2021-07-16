@@ -60,8 +60,8 @@ elif [[ $1 == 'train' ]]; then
     echo 'Run training...'
     CUDA_VISIBLE_DEVICES='0,1,2,3' python train_gpu.py \
         --data_dir=${DATA_ROOT}/tfrecords \
-        --record_info_dir=${DATA_ROOT}/tfrecords/ \
-        --corpus_info_path=${DATA_ROOT}/corpus-info.json \
+        --record_infcorpus_info_patho_dir=${DATA_ROOT}/tfrecords/ \
+        --=${DATA_ROOT}/corpus-info.json \
         --model_dir=EXP-doupo4-1_head-1e4 \
         --div_val=${DIV_VAL} \
         --untie_r=True \
