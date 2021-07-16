@@ -256,7 +256,7 @@ def create_ordered_tfrecords(save_dir, basename, data, batch_size, tgt_len,
             basename, batch_size, tgt_len)
 
     save_path = os.path.join(save_dir, file_name)
-    record_writer = tf.python_io.TFRecordWriter(save_path)
+    record_writer = tf.compat.v1.python_io.TFRecordWriter(save_path)
 
     batched_data = batchify(data, batch_size, num_passes)
 
@@ -432,7 +432,7 @@ def get_input_fn(record_info_dir, split, per_host_bsz, tgt_len,
     bin_sizes = record_info["bin_sizes"]
     num_batch = record_info["num_batch"]
 
-    tf.logging.info("[{}] File names {}".format(split, file_names))
+    tf.compat.v1.logging.info("[{}] File names {}".format(split, file_names))
 
     def input_fn(params):
         # per-core batch size
@@ -449,11 +449,11 @@ def get_input_fn(record_info_dir, split, per_host_bsz, tgt_len,
                     tup = example.pop("{}_tup_{}".format(prefix, b))
 
                     tup = tf.reshape(
-                        tf.sparse_tensor_to_dense(tup),
+                        tf.compat.v1.sparse_tensor_to_dense(tup),
                         shape=[cnt, 2])
 
                     # tf.float32
-                    perm = tf.sparse_to_dense(
+                    perm = tf.compat.v1.sparse_to_dense(
                         sparse_indices=tup,
                         output_shape=[tgt_len, bin_sizes[b]],
                         sparse_values=1.0,
@@ -464,31 +464,31 @@ def get_input_fn(record_info_dir, split, per_host_bsz, tgt_len,
             # whether allow the last batch with a potentially shorter length
             if use_tpu:
                 record_spec = {
-                    "inputs": tf.FixedLenFeature([tgt_len], tf.int64),
-                    "labels": tf.FixedLenFeature([tgt_len], tf.int64),
+                    "inputs": tf.compat.v1.FixedLenFeature([tgt_len], tf.int64),
+                    "labels": tf.compat.v1.FixedLenFeature([tgt_len], tf.int64),
                 }
             else:
                 record_spec = {
-                    "inputs": tf.VarLenFeature(tf.int64),
-                    "labels": tf.VarLenFeature(tf.int64),
+                    "inputs": tf.compat.v1.VarLenFeature(tf.int64),
+                    "labels": tf.compat.v1.VarLenFeature(tf.int64),
                 }
 
             # permutation related features
             if bin_sizes and use_tpu:
                 # tf.float32
-                record_spec["inp_mask"] = tf.FixedLenFeature([tgt_len], tf.float32)
-                record_spec["tgt_mask"] = tf.FixedLenFeature([tgt_len], tf.float32)
+                record_spec["inp_mask"] = tf.compat.v1.FixedLenFeature([tgt_len], tf.float32)
+                record_spec["tgt_mask"] = tf.compat.v1.FixedLenFeature([tgt_len], tf.float32)
 
-                record_spec["head_labels"] = tf.FixedLenFeature([tgt_len], tf.int64)
+                record_spec["head_labels"] = tf.compat.v1.FixedLenFeature([tgt_len], tf.int64)
 
                 for b in range(len(bin_sizes)):
-                    record_spec["inp_cnt_{}".format(b)] = tf.FixedLenFeature([1], tf.int64)
-                    record_spec["inp_tup_{}".format(b)] = tf.VarLenFeature(tf.int64)
-                    record_spec["tgt_cnt_{}".format(b)] = tf.FixedLenFeature([1], tf.int64)
-                    record_spec["tgt_tup_{}".format(b)] = tf.VarLenFeature(tf.int64)
+                    record_spec["inp_cnt_{}".format(b)] = tf.compat.v1.FixedLenFeature([1], tf.int64)
+                    record_spec["inp_tup_{}".format(b)] = tf.compat.v1.VarLenFeature(tf.int64)
+                    record_spec["tgt_cnt_{}".format(b)] = tf.compat.v1.FixedLenFeature([1], tf.int64)
+                    record_spec["tgt_tup_{}".format(b)] = tf.compat.v1.VarLenFeature(tf.int64)
 
             # retrieve serialized example
-            example = tf.parse_single_example(
+            example = tf.compat.v1.parse_single_example(
                 serialized=record,
                 features=record_spec)
 
@@ -504,7 +504,7 @@ def get_input_fn(record_info_dir, split, per_host_bsz, tgt_len,
                 if tf.keras.backend.is_sparse(val):
                     val = tf.sparse.to_dense(val)
                 if val.dtype == tf.int64:
-                    val = tf.to_int32(val)
+                    val = tf.compat.v1.to_int32(val)
                 example[key] = val
 
             if use_tpu:
@@ -590,4 +590,4 @@ if __name__ == "__main__":
     flags.DEFINE_bool("use_tpu", True,
                       help="use tpu")
 
-    tf.app.run(main)
+    tf.compat.v1.app.run(main)

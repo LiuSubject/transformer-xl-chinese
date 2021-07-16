@@ -15,18 +15,18 @@ def positional_embedding(pos_seq, inv_freq, bsz=None):
 def positionwise_FF(inp, d_model, d_inner, dropout, kernel_initializer,
                     scope='ff', is_training=True):
     output = inp
-    with tf.variable_scope(scope):
-        output = tf.layers.dense(inp, d_inner, activation=tf.nn.relu,
+    with tf.compat.v1.variable_scope(scope):
+        output = tf.compat.v1.layers.dense(inp, d_inner, activation=tf.nn.relu,
                                  kernel_initializer=kernel_initializer,
                                  name='layer_1')
-        output = tf.layers.dropout(output, dropout, training=is_training,
+        output = tf.compat.v1.layers.dropout(output, dropout, training=is_training,
                                    name='drop_1')
-        output = tf.layers.dense(output, d_model,
+        output = tf.compat.v1.layers.dense(output, d_model,
                                  kernel_initializer=kernel_initializer,
                                  name='layer_2')
-        output = tf.layers.dropout(output, dropout, training=is_training,
+        output = tf.compat.v1.layers.dropout(output, dropout, training=is_training,
                                    name='drop_2')
-        output = tf.contrib.layers.layer_norm(output + inp, begin_norm_axis=-1)
+        # output = tf.compat.v1.contrib.layers.layer_norm(output + inp, begin_norm_axis=-1)
     return output
 
 
@@ -45,7 +45,7 @@ def rel_multihead_attn(w, r, r_w_bias, r_r_bias, attn_mask, mems, d_model,
                        n_head, d_head, dropout, dropatt, is_training,
                        kernel_initializer, scope='rel_attn'):
     scale = 1 / (d_head ** 0.5)
-    with tf.variable_scope(scope):
+    with tf.compat.v1.variable_scope(scope):
         qlen = tf.shape(w)[0]
         rlen = tf.shape(r)[0]
         bsz = tf.shape(w)[1]
@@ -56,9 +56,9 @@ def rel_multihead_attn(w, r, r_w_bias, r_r_bias, attn_mask, mems, d_model,
         # cat = tf.concat([mems],
         #                 0) if mems is not None and mems.shape.ndims > 1 else w
 
-        w_heads = tf.layers.dense(cat, 3 * n_head * d_head, use_bias=False,
+        w_heads = tf.compat.v1.layers.dense(cat, 3 * n_head * d_head, use_bias=False,
                                   kernel_initializer=kernel_initializer, name='qkv')
-        r_head_k = tf.layers.dense(r, n_head * d_head, use_bias=False,
+        r_head_k = tf.compat.v1.layers.dense(r, n_head * d_head, use_bias=False,
                                    kernel_initializer=kernel_initializer, name='r')
 
         w_head_q, w_head_k, w_head_v = tf.split(w_heads, 3, -1)
@@ -84,17 +84,17 @@ def rel_multihead_attn(w, r, r_w_bias, r_r_bias, attn_mask, mems, d_model,
         attn_score = attn_score * (1 - attn_mask_t) - 1e30 * attn_mask_t
 
         attn_prob = tf.nn.softmax(attn_score, 1)
-        attn_prob = tf.layers.dropout(attn_prob, dropatt, training=is_training)
+        attn_prob = tf.compat.v1.layers.dropout(attn_prob, dropatt, training=is_training)
 
         attn_vec = tf.einsum('ijbn,jbnd->ibnd', attn_prob, w_head_v)
         size_t = tf.shape(attn_vec)
         attn_vec = tf.reshape(attn_vec, [size_t[0], size_t[1], n_head * d_head])
 
-        attn_out = tf.layers.dense(attn_vec, d_model, use_bias=False,
+        attn_out = tf.compat.v1.layers.dense(attn_vec, d_model, use_bias=False,
                                    kernel_initializer=kernel_initializer, name='o')
-        attn_out = tf.layers.dropout(attn_out, dropout, training=is_training)
+        attn_out = tf.compat.v1.layers.dropout(attn_out, dropout, training=is_training)
 
-        output = tf.contrib.layers.layer_norm(attn_out + w, begin_norm_axis=-1)
+        output = tf.compat.v1.contrib.layers.layer_norm(attn_out + w, begin_norm_axis=-1)
     return output
 
 
@@ -115,13 +115,13 @@ def mask_adaptive_embedding_lookup(x, n_token, d_embed, d_proj, cutoffs, initial
                                    proj_same_dim=True,
                                    scope='adaptive_embed', **kwargs):
     emb_scale = d_proj ** 0.5
-    with tf.variable_scope(scope):
+    with tf.compat.v1.variable_scope(scope):
         if div_val == 1:
-            lookup_table = tf.get_variable('lookup_table', [n_token, d_embed],
+            lookup_table = tf.compat.v1.get_variable('lookup_table', [n_token, d_embed],
                                            initializer=initializer)
             y = embedding_lookup(lookup_table, x, use_tpu=False)
             if d_proj != d_embed:
-                proj_W = tf.get_variable('proj_W', [d_embed, d_proj],
+                proj_W = tf.compat.v1.get_variable('proj_W', [d_embed, d_proj],
                                          initializer=proj_initializer)
                 y = tf.einsum('ibe,ed->ibd', y, proj_W)
             else:
@@ -133,23 +133,23 @@ def mask_adaptive_embedding_lookup(x, n_token, d_embed, d_proj, cutoffs, initial
             x_size = tf.shape(x)
             y = tf.zeros([x_size[0], x_size[1], d_proj])
             for i in range(len(cutoff_ends) - 1):
-                with tf.variable_scope('cutoff_{}'.format(i)):
+                with tf.compat.v1.variable_scope('cutoff_{}'.format(i)):
                     l_idx, r_idx = cutoff_ends[i], cutoff_ends[i + 1]
                     mask = (x >= l_idx) & (x < r_idx)
                     cur_x = tf.boolean_mask(x, mask) - l_idx
                     cur_d_embed = d_embed // (div_val ** i)
-                    lookup_table = tf.get_variable('lookup_table',
+                    lookup_table = tf.compat.v1.get_variable('lookup_table',
                                                    [r_idx - l_idx, cur_d_embed],
                                                    initializer=initializer)
                     cur_y = embedding_lookup(lookup_table, cur_x, use_tpu=False)
                     if d_proj == cur_d_embed and not proj_same_dim:
                         proj_W = None
                     else:
-                        proj_W = tf.get_variable('proj_W', [cur_d_embed, d_proj],
+                        proj_W = tf.compat.v1.get_variable('proj_W', [cur_d_embed, d_proj],
                                                  initializer=proj_initializer)
                         cur_y = tf.einsum('id,de->ie', cur_y, proj_W)
-                    mask_idx = tf.to_int64(tf.where(mask))
-                    y += tf.scatter_nd(mask_idx, cur_y, tf.to_int64(tf.shape(y)))
+                    mask_idx = tf.compat.v1.to_int64(tf.where(mask))
+                    y += tf.scatter_nd(mask_idx, cur_y, tf.compat.v1.to_int64(tf.shape(y)))
                     tables.append(lookup_table)
                     projs.append(proj_W)
             ret_params = [tables, projs]
@@ -169,13 +169,13 @@ def mul_adaptive_embedding_lookup(x, n_token, d_embed, d_proj, cutoffs, initiali
         the shape of perms.
     """
     emb_scale = d_proj ** 0.5
-    with tf.variable_scope(scope):
+    with tf.compat.v1.variable_scope(scope):
         if div_val == 1:
-            lookup_table = tf.get_variable('lookup_table', [n_token, d_embed],
+            lookup_table = tf.compat.v1.get_variable('lookup_table', [n_token, d_embed],
                                            initializer=initializer)
             y = embedding_lookup(lookup_table, x)
             if d_proj != d_embed:
-                proj_W = tf.get_variable('proj_W', [d_embed, d_proj],
+                proj_W = tf.compat.v1.get_variable('proj_W', [d_embed, d_proj],
                                          initializer=proj_initializer)
                 y = tf.einsum('ibe,ed->ibd', y, proj_W)
             else:
@@ -190,16 +190,16 @@ def mul_adaptive_embedding_lookup(x, n_token, d_embed, d_proj, cutoffs, initiali
             else:
                 cat_lookup = tf.zeros([x_size[0], x_size[1], d_proj])
             for i in range(len(cutoff_ends) - 1):
-                with tf.variable_scope('cutoff_{}'.format(i)):
+                with tf.compat.v1.variable_scope('cutoff_{}'.format(i)):
                     l_idx, r_idx = cutoff_ends[i], cutoff_ends[i + 1]
                     cur_d_embed = d_embed // (div_val ** i)
-                    lookup_table = tf.get_variable('lookup_table',
+                    lookup_table = tf.compat.v1.get_variable('lookup_table',
                                                    [r_idx - l_idx, cur_d_embed],
                                                    initializer=initializer)
                     if cur_d_embed == d_proj and not proj_same_dim:
                         proj_W = None
                     else:
-                        proj_W = tf.get_variable('proj_W', [cur_d_embed, d_proj],
+                        proj_W = tf.compat.v1.get_variable('proj_W', [cur_d_embed, d_proj],
                                                  initializer=proj_initializer)
                     if perms is None:
                         cat_lookup.append(tf.einsum('ie,ed->id', lookup_table, proj_W))
@@ -213,8 +213,8 @@ def mul_adaptive_embedding_lookup(x, n_token, d_embed, d_proj, cutoffs, initiali
                             cur_y *= perms[i][:, :, None]
                             cat_lookup += cur_y
                         else:
-                            cur_x = tf.einsum('ib,ibk->k', tf.to_float(x - l_idx), perms[i])
-                            cur_x = tf.to_int32(cur_x)
+                            cur_x = tf.einsum('ib,ibk->k', tf.compat.v1.to_float(x - l_idx), perms[i])
+                            cur_x = tf.compat.v1.to_int32(cur_x)
                             cur_y = embedding_lookup(lookup_table, cur_x)
                             if proj_W is not None:
                                 cur_y = tf.einsum('ke,ed->kd', cur_y, proj_W)
@@ -252,9 +252,9 @@ def mask_adaptive_logsoftmax(hidden, target, n_token, d_embed, d_proj, cutoffs,
         idx = tf.stack([r, target], 1)
         return tf.gather_nd(logprob, idx)
 
-    with tf.variable_scope(scope):
+    with tf.compat.v1.variable_scope(scope):
         if len(cutoffs) == 0:
-            softmax_b = tf.get_variable('bias', [n_token],
+            softmax_b = tf.compat.v1.get_variable('bias', [n_token],
                                         initializer=tf.zeros_initializer())
             output = _logit(hidden, params_W, softmax_b, params_projs)
             nll = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=target, logits=output)
@@ -262,7 +262,7 @@ def mask_adaptive_logsoftmax(hidden, target, n_token, d_embed, d_proj, cutoffs,
             cutoff_ends = [0] + cutoffs + [n_token]
             nll = tf.zeros_like(target, dtype=tf.float32)
             for i in range(len(cutoff_ends) - 1):
-                with tf.variable_scope('cutoff_{}'.format(i)):
+                with tf.compat.v1.variable_scope('cutoff_{}'.format(i)):
                     l_idx, r_idx = cutoff_ends[i], cutoff_ends[i + 1]
                     mask = (target >= l_idx) & (target < r_idx)
                     mask_idx = tf.where(mask)
@@ -273,7 +273,7 @@ def mask_adaptive_logsoftmax(hidden, target, n_token, d_embed, d_proj, cutoffs,
                         cur_W = params_W[l_idx: r_idx]
                     else:
                         cur_W = params_W[i]
-                    cur_b = tf.get_variable('b', [r_idx - l_idx],
+                    cur_b = tf.compat.v1.get_variable('b', [r_idx - l_idx],
                                             initializer=tf.zeros_initializer())
                     if tie_projs[i]:
                         if div_val == 1:
@@ -284,12 +284,12 @@ def mask_adaptive_logsoftmax(hidden, target, n_token, d_embed, d_proj, cutoffs,
                         if (div_val == 1 or not proj_same_dim) and d_proj == cur_d_embed:
                             cur_proj = None
                         else:
-                            cur_proj = tf.get_variable('proj', [cur_d_embed, d_proj],
+                            cur_proj = tf.compat.v1.get_variable('proj', [cur_d_embed, d_proj],
                                                        initializer=proj_initializer)
                     if i == 0:
-                        cluster_W = tf.get_variable('cluster_W', [len(cutoffs), d_embed],
+                        cluster_W = tf.compat.v1.get_variable('cluster_W', [len(cutoffs), d_embed],
                                                     initializer=tf.zeros_initializer())
-                        cluster_b = tf.get_variable('cluster_b', [len(cutoffs)],
+                        cluster_b = tf.compat.v1.get_variable('cluster_b', [len(cutoffs)],
                                                     initializer=tf.zeros_initializer())
                         cur_W = tf.concat([cur_W, cluster_W], 0)
                         cur_b = tf.concat([cur_b, cluster_b], 0)
@@ -332,9 +332,9 @@ def mul_adaptive_logsoftmax(hidden, target, n_token, d_embed, d_proj, cutoffs,
 
     params_W, params_projs = params[0], params[1]
 
-    with tf.variable_scope(scope):
+    with tf.compat.v1.variable_scope(scope):
         if len(cutoffs) == 0:
-            softmax_b = tf.get_variable('bias', [n_token],
+            softmax_b = tf.compat.v1.get_variable('bias', [n_token],
                                         initializer=tf.zeros_initializer())
             output = _logit(hidden, params_W, softmax_b, params_projs)
             nll = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=target,
@@ -344,7 +344,7 @@ def mul_adaptive_logsoftmax(hidden, target, n_token, d_embed, d_proj, cutoffs,
             total_loss, total_cnt = 0, 0
             cutoff_ends = [0] + cutoffs + [n_token]
             for i in range(len(cutoff_ends) - 1):
-                with tf.variable_scope('cutoff_{}'.format(i)):
+                with tf.compat.v1.variable_scope('cutoff_{}'.format(i)):
                     l_idx, r_idx = cutoff_ends[i], cutoff_ends[i + 1]
 
                     cur_d_embed = d_embed // (div_val ** i)
@@ -353,7 +353,7 @@ def mul_adaptive_logsoftmax(hidden, target, n_token, d_embed, d_proj, cutoffs,
                         cur_W = params_W[l_idx: r_idx]
                     else:
                         cur_W = params_W[i]
-                    cur_b = tf.get_variable('b', [r_idx - l_idx],
+                    cur_b = tf.compat.v1.get_variable('b', [r_idx - l_idx],
                                             initializer=tf.zeros_initializer())
                     if tie_projs[i]:
                         if div_val == 1:
@@ -364,13 +364,13 @@ def mul_adaptive_logsoftmax(hidden, target, n_token, d_embed, d_proj, cutoffs,
                         if (div_val == 1 or not proj_same_dim) and d_proj == cur_d_embed:
                             cur_proj = None
                         else:
-                            cur_proj = tf.get_variable('proj', [cur_d_embed, d_proj],
+                            cur_proj = tf.compat.v1.get_variable('proj', [cur_d_embed, d_proj],
                                                        initializer=proj_initializer)
 
                     if i == 0:
-                        cluster_W = tf.get_variable('cluster_W', [len(cutoffs), d_embed],
+                        cluster_W = tf.compat.v1.get_variable('cluster_W', [len(cutoffs), d_embed],
                                                     initializer=tf.zeros_initializer())
-                        cluster_b = tf.get_variable('cluster_b', [len(cutoffs)],
+                        cluster_b = tf.compat.v1.get_variable('cluster_b', [len(cutoffs)],
                                                     initializer=tf.zeros_initializer())
                         cur_W = tf.concat([cur_W, cluster_W], 0)
                         cur_b = tf.concat([cur_b, cluster_b], 0)
@@ -398,10 +398,10 @@ def mul_adaptive_logsoftmax(hidden, target, n_token, d_embed, d_proj, cutoffs,
                         cur_hidden = tf.einsum('ibd,ibk->kd', hidden, perms[i])
                         tail_logit = _logit(cur_hidden, cur_W, cur_b, cur_proj)
 
-                        tail_target = tf.einsum('ib,ibk->k', tf.to_float(target - l_idx),
+                        tail_target = tf.einsum('ib,ibk->k', tf.compat.v1.to_float(target - l_idx),
                                                 perms[i])
                         tail_nll = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                            labels=tf.to_int32(tail_target),
+                            labels=tf.compat.v1.to_int32(tail_target),
                             logits=tail_logit)
 
                         sum_nll = cur_head_nll + tail_nll
@@ -418,12 +418,12 @@ def mul_adaptive_logsoftmax(hidden, target, n_token, d_embed, d_proj, cutoffs,
 
 def _create_mask(qlen, mlen, same_length=False):
     attn_mask = tf.ones([qlen, qlen])
-    mask_u = tf.matrix_band_part(attn_mask, 0, -1)
-    mask_dia = tf.matrix_band_part(attn_mask, 0, 0)
+    mask_u = tf.compat.v1.matrix_band_part(attn_mask, 0, -1)
+    mask_dia = tf.compat.v1.matrix_band_part(attn_mask, 0, 0)
     attn_mask_pad = tf.zeros([qlen, mlen])
     ret = tf.concat([attn_mask_pad, mask_u - mask_dia], 1)
     if same_length:
-        mask_l = tf.matrix_band_part(attn_mask, -1, 0)
+        mask_l = tf.compat.v1.matrix_band_part(attn_mask, -1, 0)
         ret = tf.concat([ret[:, :qlen] + mask_l - mask_dia, ret[:, qlen:]], 1)
     return ret
 
@@ -458,16 +458,16 @@ def transformer(dec_inp, target, mems, n_token, n_layer, d_model, d_embed,
     # dec_inp = tf.Print(dec_inp, [dec_inp], "print of input: ")
 
     new_mems = []
-    with tf.variable_scope(scope):
+    with tf.compat.v1.variable_scope(scope):
         if untie_r:
-            r_w_bias = tf.get_variable('r_w_bias', [n_layer, n_head, d_head],
+            r_w_bias = tf.compat.v1.get_variable('r_w_bias', [n_layer, n_head, d_head],
                                        initializer=initializer)
-            r_r_bias = tf.get_variable('r_r_bias', [n_layer, n_head, d_head],
+            r_r_bias = tf.compat.v1.get_variable('r_r_bias', [n_layer, n_head, d_head],
                                        initializer=initializer)
         else:
-            r_w_bias = tf.get_variable('r_w_bias', [n_head, d_head],
+            r_w_bias = tf.compat.v1.get_variable('r_w_bias', [n_head, d_head],
                                        initializer=initializer)
-            r_r_bias = tf.get_variable('r_r_bias', [n_head, d_head],
+            r_r_bias = tf.compat.v1.get_variable('r_r_bias', [n_head, d_head],
                                        initializer=initializer)
 
         qlen = tf.shape(dec_inp)[0]
@@ -500,8 +500,8 @@ def transformer(dec_inp, target, mems, n_token, n_layer, d_model, d_embed,
         inv_freq = 1 / (10000 ** (tf.range(0, d_model, 2.0) / d_model))
         pos_emb = positional_embedding(pos_seq, inv_freq)
 
-        output = tf.layers.dropout(embeddings, dropout, training=is_training)
-        pos_emb = tf.layers.dropout(pos_emb, dropout, training=is_training)
+        output = tf.compat.v1.layers.dropout(embeddings, dropout, training=is_training)
+        pos_emb = tf.compat.v1.layers.dropout(pos_emb, dropout, training=is_training)
 
         if mems is None:
             mems = [None] * n_layer
@@ -510,7 +510,7 @@ def transformer(dec_inp, target, mems, n_token, n_layer, d_model, d_embed,
             # cache new mems
             new_mems.append(_cache_mem(output, mems[i], mem_len))
 
-            with tf.variable_scope('layer_{}'.format(i)):
+            with tf.compat.v1.variable_scope('layer_{}'.format(i)):
                 output = rel_multihead_attn(
                     w=output,
                     r=pos_emb,
@@ -533,7 +533,7 @@ def transformer(dec_inp, target, mems, n_token, n_layer, d_model, d_embed,
                     kernel_initializer=initializer,
                     is_training=is_training)
 
-        output = tf.layers.dropout(output, dropout, training=is_training)
+        output = tf.compat.v1.layers.dropout(output, dropout, training=is_training)
 
         logsoftmax_fn = (mul_adaptive_logsoftmax if use_tpu else
                          mask_adaptive_logsoftmax)
@@ -574,16 +574,16 @@ def transformer_inference(dec_inp, mems, mems_id, n_token, n_layer, d_model, d_e
     """
     # dec_inp = tf.Print(dec_inp, [dec_inp], "print of input in inference : ")
     new_mems = []
-    with tf.variable_scope(scope):
+    with tf.compat.v1.variable_scope(scope):
         if untie_r:
-            r_w_bias = tf.get_variable('r_w_bias', [n_layer, n_head, d_head],
+            r_w_bias = tf.compat.v1.get_variable('r_w_bias', [n_layer, n_head, d_head],
                                        initializer=initializer)
-            r_r_bias = tf.get_variable('r_r_bias', [n_layer, n_head, d_head],
+            r_r_bias = tf.compat.v1.get_variable('r_r_bias', [n_layer, n_head, d_head],
                                        initializer=initializer)
         else:
-            r_w_bias = tf.get_variable('r_w_bias', [n_head, d_head],
+            r_w_bias = tf.compat.v1.get_variable('r_w_bias', [n_head, d_head],
                                        initializer=initializer)
-            r_r_bias = tf.get_variable('r_r_bias', [n_head, d_head],
+            r_r_bias = tf.compat.v1.get_variable('r_r_bias', [n_head, d_head],
                                        initializer=initializer)
 
         qlen = tf.shape(dec_inp)[0]
@@ -614,8 +614,8 @@ def transformer_inference(dec_inp, mems, mems_id, n_token, n_layer, d_model, d_e
         inv_freq = 1 / (10000 ** (tf.range(0, d_model, 2.0) / d_model))
         pos_emb = positional_embedding(pos_seq, inv_freq)
 
-        output = tf.layers.dropout(embeddings, dropout, training=is_training)
-        pos_emb = tf.layers.dropout(pos_emb, dropout, training=is_training)
+        output = tf.compat.v1.layers.dropout(embeddings, dropout, training=is_training)
+        pos_emb = tf.compat.v1.layers.dropout(pos_emb, dropout, training=is_training)
 
         if mems is None:
             mems = [None] * n_layer
@@ -630,7 +630,7 @@ def transformer_inference(dec_inp, mems, mems_id, n_token, n_layer, d_model, d_e
             new_mems.append(_cache_mem(output, mems[i], mem_len))
             new_mem_id.append(_cache_mem(dec_inp, mems_id[i], mem_len))
 
-            with tf.variable_scope('layer_{}'.format(i)):
+            with tf.compat.v1.variable_scope('layer_{}'.format(i)):
                 output, attn_prob = rel_multihead_attn_for_inference(
                     w=output,
                     r=pos_emb,
@@ -655,7 +655,7 @@ def transformer_inference(dec_inp, mems, mems_id, n_token, n_layer, d_model, d_e
                     kernel_initializer=initializer,
                     is_training=is_training)
 
-        output = tf.layers.dropout(output, dropout, training=is_training)
+        output = tf.compat.v1.layers.dropout(output, dropout, training=is_training)
         idx_output = compute_output(output, n_token, cutoffs, shared_params)
 
         loss = 0
@@ -672,9 +672,9 @@ def compute_output(hidden, n_token, cutoffs, params, scope='adaptive_softmax'):
 
     params_W, params_projs = params[0], params[1]
 
-    with tf.variable_scope(scope):
+    with tf.compat.v1.variable_scope(scope):
         if len(cutoffs) == 0:
-            softmax_b = tf.get_variable('bias', [n_token],
+            softmax_b = tf.compat.v1.get_variable('bias', [n_token],
                                         initializer=tf.zeros_initializer())
             output_idx = _logit(hidden, params_W, softmax_b, params_projs)
             return output_idx
@@ -695,16 +695,16 @@ def rel_multihead_attn_for_inference(w, r, r_w_bias, r_r_bias, attn_mask, mems, 
                        n_head, d_head, dropout, dropatt, is_training,
                        kernel_initializer, scope='rel_attn'):
     scale = 1 / (d_head ** 0.5)
-    with tf.variable_scope(scope):
+    with tf.compat.v1.variable_scope(scope):
         qlen = tf.shape(w)[0]
         rlen = tf.shape(r)[0]
         bsz = tf.shape(w)[1]
 
         cat = tf.concat([mems, w],
                         0) if mems is not None and mems.shape.ndims > 1 else w
-        w_heads = tf.layers.dense(cat, 3 * n_head * d_head, use_bias=False,
+        w_heads = tf.compat.v1.layers.dense(cat, 3 * n_head * d_head, use_bias=False,
                                   kernel_initializer=kernel_initializer, name='qkv')
-        r_head_k = tf.layers.dense(r, n_head * d_head, use_bias=False,
+        r_head_k = tf.compat.v1.layers.dense(r, n_head * d_head, use_bias=False,
                                    kernel_initializer=kernel_initializer, name='r')
 
         w_head_q, w_head_k, w_head_v = tf.split(w_heads, 3, -1)
@@ -730,15 +730,15 @@ def rel_multihead_attn_for_inference(w, r, r_w_bias, r_r_bias, attn_mask, mems, 
         attn_score = attn_score * (1 - attn_mask_t) - 1e30 * attn_mask_t
 
         attn_prob = tf.nn.softmax(attn_score, 1)
-        attn_prob = tf.layers.dropout(attn_prob, dropatt, training=is_training)
+        attn_prob = tf.compat.v1.layers.dropout(attn_prob, dropatt, training=is_training)
 
         attn_vec = tf.einsum('ijbn,jbnd->ibnd', attn_prob, w_head_v)
         size_t = tf.shape(attn_vec)
         attn_vec = tf.reshape(attn_vec, [size_t[0], size_t[1], n_head * d_head])
 
-        attn_out = tf.layers.dense(attn_vec, d_model, use_bias=False,
+        attn_out = tf.compat.v1.layers.dense(attn_vec, d_model, use_bias=False,
                                    kernel_initializer=kernel_initializer, name='o')
-        attn_out = tf.layers.dropout(attn_out, dropout, training=is_training)
+        attn_out = tf.compat.v1.layers.dropout(attn_out, dropout, training=is_training)
 
-        output = tf.contrib.layers.layer_norm(attn_out + w, begin_norm_axis=-1)
+        output = None
     return output, attn_prob

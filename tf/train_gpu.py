@@ -578,7 +578,7 @@ def inference(n_token, cutoffs, ps_device):
 
         saver.restore(sess, eval_ckpt_path)
 
-        # attention_score = tf.get_variable('transformer/layer_2/rel_attn/transpose_1:0')
+        # attention_score = tf.compat.v1.get_variable('transformer/layer_2/rel_attn/transpose_1:0')
 
         fetches = [tower_new_mems,
                    tower_output,

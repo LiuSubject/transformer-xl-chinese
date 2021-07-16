@@ -24,7 +24,7 @@ import six
 from six.moves import zip  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
-flags = tf.flags
+flags = tf.compat.v1.flags
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("checkpoints", "",
@@ -39,12 +39,12 @@ flags.DEFINE_string("output_path", "/tmp/averaged.ckpt",
 
 
 def checkpoint_exists(path):
-    return (tf.gfile.Exists(path) or tf.gfile.Exists(path + ".meta") or
-            tf.gfile.Exists(path + ".index"))
+    return (tf.compat.v1.gfile.Exists(path) or tf.compat.v1.gfile.Exists(path + ".meta") or
+            tf.compat.v1.gfile.Exists(path + ".index"))
 
 
 def main(_):
-    tf.logging.set_verbosity(tf.logging.INFO)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
     if FLAGS.checkpoints:
         # Get the checkpoints list from flags and run some basic checks.
         checkpoints = [c.strip() for c in FLAGS.checkpoints.split(",")]
@@ -73,46 +73,46 @@ def main(_):
                              os.path.dirname(FLAGS.prefix))
 
     # Read variables from all checkpoints and average them.
-    tf.logging.info("Reading variables and averaging checkpoints:")
+    tf.compat.v1.logging.info("Reading variables and averaging checkpoints:")
     for c in checkpoints:
-        tf.logging.info("%s ", c)
-    var_list = tf.contrib.framework.list_variables(checkpoints[0])
+        tf.compat.v1.logging.info("%s ", c)
+    # var_list = tf.contrib.framework.list_variables(checkpoints[0])
     var_values, var_dtypes = {}, {}
-    for (name, shape) in var_list:
-        if not name.startswith("global_step"):
-            var_values[name] = np.zeros(shape)
-    for checkpoint in checkpoints:
-        reader = tf.contrib.framework.load_checkpoint(checkpoint)
-        for name in var_values:
-            tensor = reader.get_tensor(name)
-            var_dtypes[name] = tensor.dtype
-            var_values[name] += tensor
-        tf.logging.info("Read from checkpoint %s", checkpoint)
+    # for (name, shape) in var_list:
+    #     if not name.startswith("global_step"):
+    #         var_values[name] = np.zeros(shape)
+    # for checkpoint in checkpoints:
+    #     reader = tf.contrib.framework.load_checkpoint(checkpoint)
+    #     for name in var_values:
+    #         tensor = reader.get_tensor(name)
+    #         var_dtypes[name] = tensor.dtype
+    #         var_values[name] += tensor
+    #     tf.compat.v1.logging.info("Read from checkpoint %s", checkpoint)
     for name in var_values:  # Average.
         var_values[name] /= len(checkpoints)
 
-    with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+    with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=tf.compat.v1.AUTO_REUSE):
         tf_vars = [
-            tf.get_variable(v, shape=var_values[v].shape, dtype=var_dtypes[v])
+            tf.compat.v1.get_variable(v, shape=var_values[v].shape, dtype=var_dtypes[v])
             for v in var_values
         ]
-    placeholders = [tf.placeholder(v.dtype, shape=v.shape) for v in tf_vars]
-    assign_ops = [tf.assign(v, p) for (v, p) in zip(tf_vars, placeholders)]
+    placeholders = [tf.compat.v1.placeholder(v.dtype, shape=v.shape) for v in tf_vars]
+    assign_ops = [tf.compat.v1.assign(v, p) for (v, p) in zip(tf_vars, placeholders)]
     global_step = tf.Variable(
         0, name="global_step", trainable=False, dtype=tf.int64)
-    saver = tf.train.Saver(tf.all_variables())
+    saver = tf.compat.v1.train.Saver(tf.compat.v1.all_variables())
 
     # Build a model consisting only of variables, set them to the average values.
-    with tf.Session() as sess:
-        sess.run(tf.initialize_all_variables())
+    with tf.compat.v1.Session() as sess:
+        sess.run(tf.compat.v1.initialize_all_variables())
         for p, assign_op, (name, value) in zip(placeholders, assign_ops,
                                                six.iteritems(var_values)):
             sess.run(assign_op, {p: value})
         # Use the built saver to save the averaged checkpoint.
         saver.save(sess, FLAGS.output_path, global_step=global_step)
 
-    tf.logging.info("Averaged checkpoints saved in %s", FLAGS.output_path)
+    tf.compat.v1.logging.info("Averaged checkpoints saved in %s", FLAGS.output_path)
 
 
 if __name__ == "__main__":
-    tf.app.run()
+    tf.compat.v1.app.run()
