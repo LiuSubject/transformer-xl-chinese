@@ -19,7 +19,7 @@ TGT_LEN=100
 MEM_LEN=100
 
 
-BSZ=64
+BSZ=128
 NUM_CORE=4
 
 # Testing
