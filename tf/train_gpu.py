@@ -484,7 +484,7 @@ def evaluate(n_token, cutoffs, ps_device):
 def main(unused_argv):
     del unused_argv  # Unused
 
-    tf.compat.v1.logging.set_verbosity(tf.logging.INFO)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
     # Get corpus info
     corpus_info = data_utils.get_corpus_info(FLAGS.corpus_info_path)
