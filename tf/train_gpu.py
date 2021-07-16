@@ -732,4 +732,4 @@ def get_model_fn_for_inference(n_token, cutoffs):
 
 
 if __name__ == "__main__":
-    tf.app.run()
+    tf.compat.v1.app.run()
