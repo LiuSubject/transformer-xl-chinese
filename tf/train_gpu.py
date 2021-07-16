@@ -267,7 +267,7 @@ def train(n_token, cutoffs, ps_device):
         reuse = True if i > 0 else None
         #todo  review here
         with tf.compat.v1.device(assign_to_gpu(i, ps_device)), \
-             tf.compat.v1.variable_scope(tf.Variable(), reuse=reuse):
+             tf.compat.v1.variable_scope(tf.Variable, reuse=reuse):
             mems_i = [tf.compat.v1.placeholder(tf.compat.v1.float32,
                                      [FLAGS.mem_len, per_core_bsz, FLAGS.d_model])
                       for _ in range(FLAGS.n_layer)]
@@ -413,7 +413,7 @@ def evaluate(n_token, cutoffs, ps_device):
 
     for i in range(FLAGS.num_core_per_host):
         with tf.compat.v1.device(assign_to_gpu(i, ps_device)), \
-             tf.compat.v1.variable_scope(tf.Variable(), reuse=tf.compat.v1.AUTO_REUSE):
+             tf.compat.v1.variable_scope(tf.Variable, reuse=tf.compat.v1.AUTO_REUSE):
             mems_i = [tf.compat.v1.placeholder(tf.compat.v1.float32,
                                      [FLAGS.mem_len, per_core_bsz, FLAGS.d_model])
                       for _ in range(FLAGS.n_layer)]
@@ -529,7 +529,7 @@ def inference(n_token, cutoffs, ps_device):
 
     for i in range(FLAGS.num_core_per_host):
         with tf.compat.v1.device(assign_to_gpu(i, ps_device)), \
-             tf.compat.v1.variable_scope(tf.Variable(), reuse=tf.compat.v1.AUTO_REUSE):
+             tf.compat.v1.variable_scope(tf.Variable, reuse=tf.compat.v1.AUTO_REUSE):
             mems_i = [tf.compat.v1.placeholder(tf.compat.v1.float32,
                                      [FLAGS.mem_len, per_core_bsz, FLAGS.d_model])
                       for _ in range(FLAGS.n_layer)]
