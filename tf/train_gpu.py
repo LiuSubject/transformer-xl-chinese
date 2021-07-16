@@ -198,16 +198,16 @@ def get_model_fn(n_token, cutoffs):
             proj_same_dim=FLAGS.proj_same_dim)
 
         # number of parameters
-        num_params = sum([np.prod(v.shape) for v in tf.trainable_variables()])
-        tf.logging.info('#params: {}'.format(num_params))
+        num_params = sum([np.prod(v.shape) for v in tf.compat.v1.trainable_variables()])
+        tf.compat.v1.logging.info('#params: {}'.format(num_params))
 
         # format_str = '{{:<{0}s}}\t{{}}'.format(
         #     max([len(v.name) for v in tf.trainable_variables()]))
         # for v in tf.trainable_variables():
-        #   tf.logging.info(format_str.format(v.name, v.get_shape()))
+        #   tf.compat.v1.logging.info(format_str.format(v.name, v.get_shape()))
 
         if is_training:
-            all_vars = tf.trainable_variables()
+            all_vars = tf.compat.v1.trainable_variables()
             grads = tf.gradients(loss, all_vars)
             grads_and_vars = list(zip(grads, all_vars))
 
@@ -245,7 +245,7 @@ def train(n_token, cutoffs, ps_device):
         num_hosts=1,
         use_tpu=False)
 
-    tf.logging.info("num of batches {}".format(train_record_info["num_batch"]))
+    tf.compat.v1.logging.info("num of batches {}".format(train_record_info["num_batch"]))
 
     # Create computational graph
     train_set = train_input_fn({
@@ -267,8 +267,8 @@ def train(n_token, cutoffs, ps_device):
         reuse = True if i > 0 else None
         #todo  review here
         with tf.device(assign_to_gpu(i, ps_device)), \
-             tf.variable_scope(tf.get_variable_scope(), reuse=reuse):
-            mems_i = [tf.placeholder(tf.float32,
+             tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=reuse):
+            mems_i = [tf.compat.v1.placeholder(tf.float32,
                                      [FLAGS.mem_len, per_core_bsz, FLAGS.d_model])
                       for _ in range(FLAGS.n_layer)]
 
@@ -299,17 +299,17 @@ def train(n_token, cutoffs, ps_device):
     grads_and_vars = list(zip(clipped, all_vars))
 
     # configure the optimizer
-    global_step = tf.train.get_or_create_global_step()
+    global_step = tf.compat.v1.train.get_or_create_global_step()
 
     # warmup stage: increase the learning rate linearly
     if FLAGS.warmup_steps > 0:
-        warmup_lr = tf.to_float(global_step) / tf.to_float(FLAGS.warmup_steps) \
+        warmup_lr = tf.compat.v1.to_float(global_step) / tf.compat.v1.to_float(FLAGS.warmup_steps) \
                     * FLAGS.learning_rate
     else:
         warmup_lr = 0.0
 
     # decay stage: decay the learning rate using the cosine schedule
-    decay_lr = tf.train.cosine_decay(
+    decay_lr = tf.compat.v1.train.cosine_decay(
         FLAGS.learning_rate,
         global_step=global_step - FLAGS.warmup_steps,
         decay_steps=FLAGS.train_steps - FLAGS.warmup_steps,
@@ -320,7 +320,7 @@ def train(n_token, cutoffs, ps_device):
                              warmup_lr, decay_lr)
 
     # get the train op
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+    optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=learning_rate)
     train_op = optimizer.apply_gradients(grads_and_vars, global_step)
 
     # Training loop
@@ -330,21 +330,21 @@ def train(n_token, cutoffs, ps_device):
         for core in range(FLAGS.num_core_per_host)
     ]
 
-    saver = tf.train.Saver()
+    saver = tf.compat.v1.train.Saver()
 
     tf.summary.scalar('learning_rate', learning_rate)
     tf.summary.scalar('loss', loss)
     # tf.summary.scalar('pplx', math.exp(curr_loss))
-    merged = tf.summary.merge_all()
+    merged = tf.compat.v1.summary.merge_all()
 
-    with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
-        sess.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(allow_soft_placement=True)) as sess:
+        sess.run(tf.compat.v1.global_variables_initializer())
 
         # todo 放在 此处是因为不用重复的创建trainer目录能显示变量
-        train_writer = tf.summary.FileWriter(os.path.join(FLAGS.model_dir, "log"), sess.graph)
+        train_writer = tf.compat.v1.summary.FileWriter(os.path.join(FLAGS.model_dir, "log"), sess.graph)
 
         if FLAGS.warm_start_path is not None:
-            tf.logging.info("warm start from {}".format(FLAGS.warm_start_path))
+            tf.compat.v1.logging.info("warm start from {}".format(FLAGS.warm_start_path))
             saver.restore(sess, FLAGS.warm_start_path)
 
         fetches = [loss, tower_new_mems, global_step, gnorm, learning_rate, train_op]
@@ -367,7 +367,7 @@ def train(n_token, cutoffs, ps_device):
 
             if curr_step > 0 and curr_step % FLAGS.iterations == 0:
                 curr_loss = total_loss / (curr_step - prev_step)
-                tf.logging.info("[{}] | gnorm {:.2f} lr {:8.6f} "
+                tf.compat.v1.logging.info("[{}] | gnorm {:.2f} lr {:8.6f} "
                                 "| loss {:.2f} | pplx {:>7.2f}, bpc {:>7.4f}".format(curr_step, fetched[-3], fetched[-2], curr_loss, math.exp(curr_loss), curr_loss / math.log(2)))
                 total_loss, prev_step = 0., curr_step
                 train_writer.add_summary(summary, curr_step)
@@ -375,7 +375,7 @@ def train(n_token, cutoffs, ps_device):
             if curr_step > 0 and curr_step % FLAGS.save_steps == 0:
                 save_path = os.path.join(FLAGS.model_dir, "model-{}.ckpt".format(curr_step))
                 saver.save(sess, save_path)
-                tf.logging.info("Model saved in path: {}".format(save_path))
+                tf.compat.v1.logging.info("Model saved in path: {}".format(save_path))
 
             if curr_step == FLAGS.train_steps:
                 train_writer.close()
@@ -396,7 +396,7 @@ def evaluate(n_token, cutoffs, ps_device):
     num_batch = eval_record_info["num_batch"]
     if FLAGS.max_eval_batch > 0:
         num_batch = FLAGS.max_eval_batch
-    tf.logging.info("num of batches {}".format(num_batch))
+    tf.compat.v1.logging.info("num of batches {}".format(num_batch))
 
     # Create computational graph
     eval_set = eval_input_fn({
@@ -413,8 +413,8 @@ def evaluate(n_token, cutoffs, ps_device):
 
     for i in range(FLAGS.num_core_per_host):
         with tf.device(assign_to_gpu(i, ps_device)), \
-             tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
-            mems_i = [tf.placeholder(tf.float32,
+             tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=tf.compat.v1.AUTO_REUSE):
+            mems_i = [tf.compat.v1.placeholder(tf.float32,
                                      [FLAGS.mem_len, per_core_bsz, FLAGS.d_model])
                       for _ in range(FLAGS.n_layer)]
 
@@ -443,16 +443,16 @@ def evaluate(n_token, cutoffs, ps_device):
         for core in range(FLAGS.num_core_per_host)
     ]
 
-    saver = tf.train.Saver()
+    saver = tf.compat.v1.train.Saver()
 
-    with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
-        sess.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(allow_soft_placement=True)) as sess:
+        sess.run(tf.compat.v1.global_variables_initializer())
 
         if FLAGS.eval_ckpt_path is None:
             eval_ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
         else:
             eval_ckpt_path = FLAGS.eval_ckpt_path
-        tf.logging.info("Evaluate {}".format(eval_ckpt_path))
+        tf.compat.v1.logging.info("Evaluate {}".format(eval_ckpt_path))
         saver.restore(sess, eval_ckpt_path)
 
         fetches = [loss, tower_new_mems, tf.size(label_feed)]
@@ -463,7 +463,7 @@ def evaluate(n_token, cutoffs, ps_device):
         total_loss, total_cnt = 0, 0
         for step in range(num_batch):
             if step % (num_batch // 10) == 0:
-                tf.logging.info(format_str.format(step, num_batch))
+                tf.compat.v1.logging.info(format_str.format(step, num_batch))
 
             feed_dict = {}
             for i in range(FLAGS.num_core_per_host):
@@ -477,7 +477,7 @@ def evaluate(n_token, cutoffs, ps_device):
             total_cnt += cnt_np
 
         avg_loss = total_loss / total_cnt
-        tf.logging.info("| loss {:.2f} | pplx {:>7.2f}, bpc {:>7.4f}".format(
+        tf.compat.v1.logging.info("| loss {:.2f} | pplx {:>7.2f}, bpc {:>7.4f}".format(
             avg_loss, math.exp(avg_loss), avg_loss / math.log(2)))
 
 
@@ -490,7 +490,7 @@ def main(unused_argv):
     corpus_info = data_utils.get_corpus_info(FLAGS.corpus_info_path)
     n_token = corpus_info["vocab_size"]
     cutoffs = corpus_info["cutoffs"][1:-1]
-    tf.logging.info("n_token {}".format(n_token))
+    tf.compat.v1.logging.info("n_token {}".format(n_token))
 
     if FLAGS.do_train:
         train(n_token, cutoffs, "/gpu:0")
@@ -510,7 +510,7 @@ def inference(n_token, cutoffs, ps_device):
     n_token = len(tmp_Vocab)
     # print(tmp_Vocab.idx2sym)
 
-    test_list = tf.placeholder(tf.int64, shape=[1, None])
+    test_list = tf.compat.v1.placeholder(tf.int64, shape=[1, None])
     dataset = tf.data.Dataset.from_tensors(test_list)
     # dataset = dataset.batch(1, drop_remainder=True)
 
@@ -529,12 +529,12 @@ def inference(n_token, cutoffs, ps_device):
 
     for i in range(FLAGS.num_core_per_host):
         with tf.device(assign_to_gpu(i, ps_device)), \
-             tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
-            mems_i = [tf.placeholder(tf.float32,
+             tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=tf.compat.v1.AUTO_REUSE):
+            mems_i = [tf.compat.v1.placeholder(tf.float32,
                                      [FLAGS.mem_len, per_core_bsz, FLAGS.d_model])
                       for _ in range(FLAGS.n_layer)]
 
-            mems_i_id = [tf.placeholder(tf.int64,
+            mems_i_id = [tf.compat.v1.placeholder(tf.int64,
                                      [FLAGS.mem_len, per_core_bsz])
                       for _ in range(FLAGS.n_layer)]
 
@@ -566,10 +566,10 @@ def inference(n_token, cutoffs, ps_device):
         for core in range(FLAGS.num_core_per_host)
     ]
 
-    saver = tf.train.Saver()
+    saver = tf.compat.v1.train.Saver()
 
-    with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
-        sess.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(allow_soft_placement=True)) as sess:
+        sess.run(tf.compat.v1.global_variables_initializer())
 
         if FLAGS.eval_ckpt_path is None:
             eval_ckpt_path = tf.train.latest_checkpoint(FLAGS.model_dir)
@@ -724,8 +724,8 @@ def get_model_fn_for_inference(n_token, cutoffs):
             proj_same_dim=FLAGS.proj_same_dim)
 
         # number of parameters
-        num_params = sum([np.prod(v.shape) for v in tf.trainable_variables()])
-        tf.logging.info('#params: {}'.format(num_params))
+        num_params = sum([np.prod(v.shape) for v in tf.compat.v1.trainable_variables()])
+        tf.compat.v1.logging.info('#params: {}'.format(num_params))
 
         return new_mems, output, new_mems_id, attn_prob
 
